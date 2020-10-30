@@ -1,0 +1,62 @@
+{
+  "builders": [
+    {
+      "CPUs": "{{user `var_vm_cpu_count`}}",
+      "RAM": "{{user `var_vm_ram_size`}}",
+      "boot_command": [
+        "<up><wait><tab><wait> text ks=http://{{ .HTTPIP }}:{{ .HTTPPort }}/ks.cfg<enter><wait>"
+      ],
+      "cluster": "{{user `var_vsphere_cluster`}}",
+      "communicator": "ssh",
+      "convert_to_template": "true",
+      "datacenter": "{{user `var_vsphere_datacenter`}}",
+      "datastore": "{{user `var_vsphere_datastore`}}",
+      "disk_controller_type": "{{user `var_vm_disk_controller`}}",
+      "folder": "{{user `var_vsphere_folder`}}",
+      "guest_os_type": "{{user `var_vm_guestos`}}",
+      "http_directory": "centos/http/8",
+      "http_port_max": 8610,
+      "http_port_min": 8601,
+      "insecure_connection": "true",
+      "iso_paths": [
+        "{{user `var_vsphere_iso_datastore`}} {{user `var_iso_path`}}"
+      ],
+      "name": "CentOS8-minimal",
+      "network_adapters": [
+        {
+          "network": "{{user `var_vsphere_network`}}",
+          "network_card": "vmxnet3"
+        }
+      ],
+      "notes": "{{user `var_vm_notes`}}",
+      "password": "{{user `var_vsphere_password`}}",
+      "remove_cdrom": "true",
+      "shutdown_command": "echo '{{user `var_guest_password`}}' | sudo -S -E shutdown -P now",
+      "ssh_password": "{{user `var_guest_password`}}",
+      "ssh_username": "{{user `var_guest_username`}}",
+      "storage": [
+        {
+          "disk_size": "{{user `var_vm_disk_size`}}",
+          "disk_thin_provisioned": true
+        }
+      ],
+      "type": "vsphere-iso",
+      "username": "{{user `var_vsphere_username`}}",
+      "vcenter_server": "{{user `var_vsphere_vcenter`}}",
+      "vm_name": "{{user `var_vm_name`}}"
+    }
+  ],
+  "variables": {
+    "var_guest_password": "VMware1!",
+    "var_guest_username": "user",
+    "var_iso_path": "ISO/CentOS-8.1.1911-x86_64-dvd1.iso",
+    "var_vm_cpu_count": "1",
+    "var_vm_disk_controller": "pvscsi",
+    "var_vm_disk_size": "20000",
+    "var_vm_guestos": "centos8_64Guest",
+    "var_vm_name": "centos8",
+    "var_vm_notes": "1.0-{{isotime \"20060102_1504\"}} (CentOS-8.1.1911-x86_64-dvd1.iso)",
+    "var_vm_ram_size": "4096"
+  }
+}
+

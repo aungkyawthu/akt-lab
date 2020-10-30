@@ -1,0 +1,11 @@
+{
+    "var_vsphere_vcenter": "172.17.31.112",
+    "var_vsphere_username": "administrator@akt.lab",
+    "var_vsphere_password": "VMware1!",
+    "var_vsphere_datacenter": "DC-1",
+    "var_vsphere_cluster": "Cluster-1",
+    "var_vsphere_datastore": "vsanDatastore",
+    "var_vsphere_network": "vm-pg-01",
+    "var_vsphere_folder": "/Template",
+    "var_vsphere_iso_datastore": "[vsanDatastore]"
+  }
