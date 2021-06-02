@@ -1,0 +1,214 @@
+Router configuration for VyOS that will
+
+learn routes via BGP
+propagate routes via BGP
+This configuration is at the moment used to bridge NSX-T in a homelab environment to the existing homerouter network
+
+Network Design
+The simplified network setup looks like the following
+
+HOME ROUTER (192.168.178.1/24)      <->     (192.168.178.245/24) VyOS BOX (192.168.255.5/24)        <->    (192.168.178.10/24, 192.168.178.11/24, 192.168.178.12/24) NSX-T T0 (10.0.0.0/16)
+On my home router I have two static routes
+
+192.168.255.0/24 via 192.168.178.245 to make the transit network routable
+10.0.0.0/16 via 192.168.178.245 to have all this traffic going to the VyOS box
+Install VyOS applicance
+Download the latest VyOS ISO and use it to deploy a VM with a configuration like:
+
+1 vCPU
+1 GB RAM
+3 GB disk
+2+ network interfaces
+Once you boot the VM with the VyOS ISO you can simply install VyOS using
+
+install image
+Note: VyOS will per default not have SSH enabled so you will need to login to the VM via a web console (e.g. from vCenter)
+
+Configuration
+VyOS is a regular Linux but offers a configuration experience similar to commercials switches/routers. A quick-start explains the basics in more detail. What is important:
+
+configure sets the config mode
+commit applies the changes done since the last commit. It does not persist the changes
+save persists the changes so that hey will be applied after reboot
+Set IP addresses and default route
+eth0 is the interface connected to my home router
+eth1 is for the transit network between VyOS and NSX-T
+set interfaces ethernet eth0 address '192.168.178.245/24'
+set interfaces ethernet eth1 address '192.168.255.5/24'
+set protocols static route 0.0.0.0/0 next-hop 192.168.178.1
+
+commit
+save
+Enable SSH
+set service ssh port '22'
+
+commit
+save
+Enable BGP
+Enable BGP with
+
+AS 65010 for VyOS
+AS 65000 for NSX-T (needs to be configured in NSX-T)
+have the VyOS box advertise its connected routes to NSX-T
+set protocols bgp 65010 address-family ipv4-unicast redistribute connected
+set protocols bgp 65010 neighbor 192.168.255.10 remote-as '65000'
+set protocols bgp 65010 neighbor 192.168.255.11 remote-as '65000'
+set protocols bgp 65010 neighbor 192.168.255.12 remote-as '65000'
+
+commit
+save
+The BGP status can be checked in the the regular mode (not configure mode) using:
+
+$ show ip bgp summary
+
+IPv4 Unicast Summary:
+BGP router identifier 192.168.255.5, local AS number 65010 vrf-id 0
+BGP table version 20
+RIB entries 37, using 6808 bytes of memory
+Peers 3, using 61 KiB of memory
+
+Neighbor        V         AS MsgRcvd MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd
+192.168.255.10  4      65000      10      10        0    0    0 00:00:31           19
+192.168.255.11  4      65000       8       7        0    0    0 00:00:31           19
+192.168.255.12  4      65000       8       7        0    0    0 00:00:31           19
+
+Total number of neighbors 3
+Routes can be checked either via ip r or show ip bgp:
+
+$ show ip bgp
+BGP table version is 20, local router ID is 192.168.255.5, vrf id 0
+Default local pref 100, local AS 65010
+Status codes:  s suppressed, d damped, h history, * valid, > best, = multipath,
+               i internal, r RIB-failure, S Stale, R Removed
+Nexthop codes: @NNN nexthop's vrf id, < announce-nh-self
+Origin codes:  i - IGP, e - EGP, ? - incomplete
+
+   Network          Next Hop            Metric LocPrf Weight Path
+*= 0.0.0.0/0        192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 10.100.0.1/32    192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 10.100.0.2/32    192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 10.200.184.1/32  192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 10.200.184.2/32  192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 10.200.184.3/32  192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 10.200.184.4/32  192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 10.200.184.5/32  192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 10.200.184.6/32  192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 10.200.184.7/32  192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 10.200.184.8/32  192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 10.200.184.9/32  192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 10.200.184.10/32 192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 10.200.184.11/32 192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 10.200.184.12/32 192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 10.200.184.13/32 192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 10.200.184.14/32 192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*= 192.168.100.0/25 192.168.255.11           0             0 65000 ?
+*=                  192.168.255.12           0             0 65000 ?
+*>                  192.168.255.10           0             0 65000 ?
+*> 192.168.178.0/24 0.0.0.0                  0         32768 ?
+*  192.168.255.0/24 192.168.255.11           0             0 65000 ?
+*                   192.168.255.12           0             0 65000 ?
+*                   192.168.255.10           0             0 65000 ?
+*>                  0.0.0.0                  0         32768 ?
+On the NSX-T side the routes can be checked by using the CLI on the Edge nodes
+
+First determine the VRF of the Service Router (7 in the example below) and use the VRF to check the routes
+
+$ ssh admin@nsxt-edge-01.home.lab
+
+NSX CLI (Edge 3.0.1.1.0.16556507). Press ? for command list or enter: help
+nsxt-edge-01> get logical-routers
+Logical Router
+UUID                                   VRF    LR-ID  Name                              Type                        Ports
+736a80e3-23f6-5a2d-81d6-bbefb2786666   0      0                                        TUNNEL                      3
+a32750c1-ece4-4321-bb63-6b1eaa273291   6      9221   DR-t0-vsk                         DISTRIBUTED_ROUTER_TIER0    5
+fcd7c7cb-abf9-457e-b6d1-5db8cf5e5963   7      9223   SR-t0-vsk                         SERVICE_ROUTER_TIER0        6
+
+nsxt-edge-01> vrf 7
+nsxt-edge-01(tier0_sr)> get route
+
+Flags: t0c - Tier0-Connected, t0s - Tier0-Static, b - BGP,
+t0n - Tier0-NAT, t1s - Tier1-Static, t1c - Tier1-Connected,
+t1n: Tier1-NAT, t1l: Tier1-LB VIP, t1ls: Tier1-LB SNAT,
+t1d: Tier1-DNS FORWARDER, t1ipsec: Tier1-IPSec, isr: Inter-SR,
+> - selected route, * - FIB route
+
+Total number of routes: 44
+
+t0s> * 0.0.0.0/0 [1/0] via 192.168.255.5, uplink-361, 00:05:32
+t1l> * 10.100.0.1/32 [3/0] via 100.64.224.1, downlink-416, 1d00h34m
+t1l> * 10.100.0.2/32 [3/0] via 100.64.224.1, downlink-416, 1d00h08m
+t1n> * 10.200.184.1/32 [3/0] via 100.64.224.1, downlink-416, 1d00h46m
+t1n> * 10.200.184.2/32 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1n> * 10.200.184.3/32 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1n> * 10.200.184.4/32 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1n> * 10.200.184.5/32 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1n> * 10.200.184.6/32 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1n> * 10.200.184.7/32 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1n> * 10.200.184.8/32 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1n> * 10.200.184.9/32 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1n> * 10.200.184.10/32 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1n> * 10.200.184.11/32 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1n> * 10.200.184.12/32 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1n> * 10.200.184.13/32 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1n> * 10.200.184.14/32 [3/0] via 100.64.224.1, downlink-416, 1d00h26m
+t1c> * 10.244.0.0/28 [3/0] via 100.64.224.1, downlink-416, 1d00h46m
+t1c> * 10.244.0.16/28 [3/0] via 100.64.224.1, downlink-416, 1d00h46m
+t1c> * 10.244.0.32/28 [3/0] via 100.64.224.1, downlink-416, 1d00h46m
+t1c> * 10.244.0.48/28 [3/0] via 100.64.224.1, downlink-416, 1d00h46m
+t1c> * 10.244.0.64/28 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1c> * 10.244.0.80/28 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1c> * 10.244.0.96/28 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1c> * 10.244.0.112/28 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1c> * 10.244.0.128/28 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1c> * 10.244.0.144/28 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1c> * 10.244.0.160/28 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1c> * 10.244.0.176/28 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1c> * 10.244.0.192/28 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1c> * 10.244.0.208/28 [3/0] via 100.64.224.1, downlink-416, 1d00h45m
+t1c> * 10.244.0.224/28 [3/0] via 100.64.224.1, downlink-416, 1d00h26m
+t0c> * 100.64.224.0/31 is directly connected, downlink-416, 1d00h46m
+t0c> * 169.254.0.0/25 is directly connected, downlink-357, 00:05:34
+isr> * 169.254.0.128/25 is directly connected, inter-sr-411, 1d03h15m
+t0c> * 192.168.100.0/25 is directly connected, downlink-359, 2d01h52m
+b  > * 192.168.178.0/24 [20/0] via 192.168.255.5, uplink-361, 00:05:32
+t0c> * 192.168.255.0/24 is directly connected, uplink-361, 1d02h28m
+isr> * 192.168.255.10/32 is directly connected, uplink-361, 1d02h28m
+isr> * 192.168.255.11/32 [200/0] via 169.254.0.131, inter-sr-411, 1d02h27m
+isr> * 192.168.255.12/32 [200/0] via 169.254.0.132, inter-sr-411, 1d02h24m
+t0c> * fc74:ca46:fc7:4000::/64 is directly connected, downlink-416, 1d00h46m
+t0c> * fe80::/64 is directly connected, downlink-416, 1d00h46m
+isr> * ff00::/8 is directly connected, inter-sr-411, 1d03h15m
